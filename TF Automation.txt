@@ -1,0 +1,376 @@
+pipeline {
+
+    agent any
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'qa', 'uat', 'prod'],
+            description: 'Terraform Environment'
+        )
+
+        string(
+            name: 'AWS_REGION',
+            defaultValue: 'us-east-1',
+            description: 'AWS Region'
+        )
+
+        booleanParam(
+            name: 'SEND_EMAIL_IF_NO_DRIFT',
+            defaultValue: true,
+            description: 'Notify even when no drift exists'
+        )
+    }
+
+    environment {
+
+        TF_IN_AUTOMATION = "true"
+
+        GIT_URL = "https://github.com/company/terraform-infra.git"
+        GIT_BRANCH = "main"
+
+        GITHUB_CREDENTIAL = "github-creds"
+
+        EMAIL_TO = "cloud-team@company.com"
+
+        S3_REPORT_BUCKET = "terraform-drift-reports"
+
+    }
+
+    triggers {
+        cron('H 6 * * *')
+    }
+
+    stages {
+
+        stage('Checkout') {
+
+            steps {
+
+                deleteDir()
+
+                git(
+                    branch: "${env.GIT_BRANCH}",
+                    credentialsId: "${env.GITHUB_CREDENTIAL}",
+                    url: "${env.GIT_URL}"
+                )
+
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    currentBuild.description =
+                            "${params.ENVIRONMENT} | ${env.GIT_COMMIT_SHORT}"
+                }
+
+            }
+
+        }
+
+        stage('Assume AWS Role') {
+
+            steps {
+
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-master-creds'
+                ]]) {
+
+                    script {
+
+                        def roleArn = ""
+
+                        switch(params.ENVIRONMENT) {
+
+                            case "dev":
+                                roleArn="arn:aws:iam::111111111111:role/TerraformRole"
+                                break
+
+                            case "qa":
+                                roleArn="arn:aws:iam::222222222222:role/TerraformRole"
+                                break
+
+                            case "uat":
+                                roleArn="arn:aws:iam::333333333333:role/TerraformRole"
+                                break
+
+                            case "prod":
+                                roleArn="arn:aws:iam::444444444444:role/TerraformRole"
+                                break
+                        }
+
+                        sh """
+                        CREDS=$(aws sts assume-role \
+                            --role-arn ${roleArn} \
+                            --role-session-name JenkinsTerraform)
+
+                        export AWS_ACCESS_KEY_ID=$(echo \$CREDS | jq -r .Credentials.AccessKeyId)
+                        export AWS_SECRET_ACCESS_KEY=$(echo \$CREDS | jq -r .Credentials.SecretAccessKey)
+                        export AWS_SESSION_TOKEN=$(echo \$CREDS | jq -r .Credentials.SessionToken)
+
+                        aws sts get-caller-identity
+                        """
+                    }
+                }
+
+            }
+
+        }
+
+        stage('Terraform Init') {
+
+            steps {
+
+                sh """
+                terraform init \
+                    -input=false \
+                    -upgrade
+                """
+
+            }
+
+        }
+
+        stage('Terraform Workspace') {
+
+            steps {
+
+                sh """
+                terraform workspace select ${params.ENVIRONMENT} || \
+                terraform workspace new ${params.ENVIRONMENT}
+                """
+
+            }
+
+        }
+
+        stage('Terraform Format') {
+
+            steps {
+
+                sh '''
+                terraform fmt -check -recursive
+                '''
+
+            }
+
+        }
+
+        stage('Terraform Validate') {
+
+            steps {
+
+                sh '''
+                terraform validate
+                '''
+
+            }
+
+        }
+
+        stage('Terraform Plan') {
+
+            steps {
+
+                script {
+
+                    sh '''
+                    set +e
+
+                    terraform plan \
+                        -out=tfplan \
+                        -detailed-exitcode \
+                        -no-color > plan.log 2>&1
+
+                    echo $? > tf_exit
+
+                    terraform show -no-color tfplan > drift-report.txt
+
+                    '''
+
+                    env.PLAN_EXIT = readFile("tf_exit").trim()
+
+                }
+
+            }
+
+        }
+
+        stage('Upload Report to S3') {
+
+            when {
+                expression { env.PLAN_EXIT == "2" }
+            }
+
+            steps {
+
+                sh """
+                aws s3 cp drift-report.txt \
+                s3://${S3_REPORT_BUCKET}/${params.ENVIRONMENT}/drift-report-${BUILD_NUMBER}.txt
+                """
+
+            }
+
+        }
+
+        stage('Archive Reports') {
+
+            steps {
+
+                archiveArtifacts(
+                        artifacts: '*.txt,plan.log',
+                        fingerprint: true
+                )
+
+            }
+
+        }
+
+        stage('Email Notification') {
+
+            steps {
+
+                script {
+
+                    def subject=""
+                    def html=""
+
+                    if(env.PLAN_EXIT=="0") {
+
+                        subject="Terraform Drift Report - No Drift"
+
+                        html="""
+                        <h2>No Drift Detected</h2>
+
+                        <table border="1">
+
+                        <tr><td>Environment</td><td>${params.ENVIRONMENT}</td></tr>
+                        <tr><td>Commit</td><td>${env.GIT_COMMIT_SHORT}</td></tr>
+                        <tr><td>Build</td><td>${env.BUILD_URL}</td></tr>
+
+                        </table>
+                        """
+
+                        if(params.SEND_EMAIL_IF_NO_DRIFT){
+
+                            emailext(
+                                to: env.EMAIL_TO,
+                                subject: subject,
+                                mimeType: 'text/html',
+                                body: html
+                            )
+                        }
+
+                    }
+
+                    else if(env.PLAN_EXIT=="2") {
+
+                        subject="Terraform Drift Detected (${params.ENVIRONMENT})"
+
+                        html="""
+                        <h2>Terraform Drift Detected</h2>
+
+                        <table border="1">
+
+                        <tr><td>Environment</td><td>${params.ENVIRONMENT}</td></tr>
+
+                        <tr><td>Commit</td><td>${env.GIT_COMMIT_SHORT}</td></tr>
+
+                        <tr><td>Build</td><td>${env.BUILD_URL}</td></tr>
+
+                        <tr><td>Status</td><td>Drift Found</td></tr>
+
+                        </table>
+
+                        <br>
+
+                        Drift report attached.
+
+                        """
+
+                        emailext(
+                                to: env.EMAIL_TO,
+                                subject: subject,
+                                mimeType: 'text/html',
+                                body: html,
+                                attachmentsPattern: "drift-report.txt"
+                        )
+
+                        currentBuild.result="UNSTABLE"
+
+                    }
+
+                    else{
+
+                        error("Terraform Plan Failed")
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    post {
+
+        success {
+
+            echo "No Drift"
+
+        }
+
+        unstable {
+
+            slackSend(
+                    channel: "#terraform-alerts",
+                    color: "warning",
+                    message:
+                    "Terraform Drift detected in ${params.ENVIRONMENT}\n${env.BUILD_URL}"
+            )
+
+        }
+
+        failure {
+
+            emailext(
+                    to: env.EMAIL_TO,
+                    subject: "Terraform Drift Job Failed",
+                    body:
+                    """
+                    Build:
+
+                    ${env.BUILD_URL}
+                    """
+            )
+
+            slackSend(
+                    channel: "#terraform-alerts",
+                    color: "danger",
+                    message:
+                    "Terraform Pipeline Failed\n${env.BUILD_URL}"
+            )
+
+        }
+
+        always {
+
+            cleanWs()
+
+        }
+
+    }
+
+}
