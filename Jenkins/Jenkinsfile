@@ -23,8 +23,7 @@ pipeline {
             steps {
                 dir('Terraform') {
                     sh '''
-                        terraform validate \
-                        -detailed-exitcode
+                        terraform validate
                     '''
                 }
             }
