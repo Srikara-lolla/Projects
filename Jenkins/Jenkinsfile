@@ -28,5 +28,15 @@ pipeline {
                 }
             }
         }
+        stage('Terraform Plan') {
+            steps {
+                dir('Terraform') {
+                    sh '''
+                        terraform plan \
+                        -detailed-exitcode
+                    '''
+                }
+            }
+        }
     }
 }
