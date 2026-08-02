@@ -55,7 +55,7 @@ pipeline {
                             terraform plan \
                             -detailed-exitcode \
                             -no-color \
-                            > plan.log 2>&1
+                            > full-plan.log 2>&1
                             echo $? > tf_exit
                             #Optional features
                             awk '/^  #|^    ~|^    \\+|^    -/' full-plan.log > summary.log || true
