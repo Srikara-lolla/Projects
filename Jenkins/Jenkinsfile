@@ -57,10 +57,17 @@ pipeline {
                             -no-color \
                             > plan.log 2>&1
                             echo $? > tf_exit
+                            #Optional features
+                            grep -E "Plan:|No changes" plan.log > summary.log || true
                         '''
                         env.PLAN_EXIT = readFile('tf_exit').trim()
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
-                        archiveArtifacts artifacts: 'plan.log', allowEmpty: true
+                        #Optional features
+                        if (fileExists('summary.log')) {
+                            echo "Terraform Plan Summary:"
+                                sh 'cat summary.log'
+                         }
+                        archiveArtifacts artifacts: 'plan.log,summary.log'
 
                         if (env.PLAN_EXIT == "0") {
                             echo "No Drift detected"
