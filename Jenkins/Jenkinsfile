@@ -57,11 +57,11 @@ pipeline {
                             terraform plan \
                             -detailed-exitcode \
                             -no-color \
-                            -out=tfplan > plan1.log 2>&1
+                            -out=tfplan > plan.log 2>&1
 
                             TF_EXIT=$?
 
-                            echo $TF_EXIT > tf_exit"
+                            echo $TF_EXIT > tf_exit
 
                             if [ $TF_EXIT -eq 0 ]; then
 
@@ -185,6 +185,15 @@ pipeline {
                 to: env.EMAIL_TO
             )
             cleanWs()
+        }
+        always {
+            echo "Cleaning Jenkins workspace..."
+
+            cleanWs(
+                deleteDirs: true,
+                disableDeferredWipeout: true
+            )
+            echo "Workspace cleanup completed"
         }
     }
 }
