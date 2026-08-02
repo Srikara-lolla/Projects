@@ -61,12 +61,18 @@ pipeline {
                             grep -E "Plan:|No changes" plan.log > summary.log || true
                         '''
                         env.PLAN_EXIT = readFile('tf_exit').trim()
+                        currentBuild.description = "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
                         //Optional features
-                        if (fileExists('summary.log')) {
-                            echo "Terraform Plan Summary:"
-                                sh 'cat summary.log'
-                         }
+                        echo "========== Terraform Plan Summary =========="
+                            sh '''
+                                if [ -s summary.log ]; then
+                                    cat summary.log
+                                else
+                                    echo "No summary generated"
+                                fi
+                                '''
+                        echo "============================================"
                         archiveArtifacts artifacts: 'plan.log,summary.log'
 
                         if (env.PLAN_EXIT == "0") {
