@@ -57,12 +57,16 @@ pipeline {
                             -no-color \
                             -out=tfplan > plan.log 2>&1
                             echo $? > tf_exit
+                            
                             #Optional features
-                            terraform show \
-                            -no-color \
-                            tfplan > full-plan.log
-                            awk '/^  #|^    ~|^    \\+|^    -/' full-plan.log > summary.log || true
+                            terraform show -no-color tfplan > full-plan.log
+                            cat <<EOF > summary.log
+                            ========== Terraform Drift Summary ==========
+                            EOF
+                            grep -A20 -E "^  #|^Plan:" full-plan.log >> summary.log
+                            
                         '''
+                        
                         env.PLAN_EXIT = readFile('tf_exit').trim()
                         currentBuild.description = "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
