@@ -167,7 +167,7 @@ pipeline {
 
                         Build URL: ${env.BUILD_URL}
                 """,
-                to: env.EMAIL_TO"
+                to: env.EMAIL_TO
             )
         }
 
