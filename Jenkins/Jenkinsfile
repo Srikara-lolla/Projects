@@ -8,7 +8,6 @@ pipeline {
     
     environment {
     TF_IN_AUTOMATION = "true"
-    TF_CLI_ARGS = "-no-color"
         }
     
     stages {
@@ -25,7 +24,8 @@ pipeline {
                 dir('Terraform') {
                     sh '''
                         terraform init \
-                            -input=false
+                            -input=false \
+                            -no-color
                     '''
                 }
             }
@@ -34,7 +34,8 @@ pipeline {
             steps {
                 dir('Terraform') {
                     sh '''
-                        terraform validate
+                        terraform validate \
+                        -no-color
                     '''
                 }
             }
@@ -51,7 +52,7 @@ pipeline {
                             > plan.log 2>&1
                             echo $? > tf_exit
                         '''
-                env.PLAN_EXIT = readFile('Terraform/tf_exit').trim()
+                env.PLAN_EXIT = readFile('tf_exit').trim()
                 echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
                     }
                 }
