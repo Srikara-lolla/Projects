@@ -140,13 +140,13 @@ pipeline {
                         Build No : ${env.BUILD_NUMBER}
                         Status   : UNSTABLE
 
-                        Please review the attached Terraform plan and summary.
+                        The logs are available under Archived Artifacts.
 
                         Build URL: ${env.BUILD_URL}
                 """,
-                to: env.EMAIL_TO,
-                attachmentsPattern: "Terraform/plan.log,Terraform/full-plan.log,Terraform/summary.log"
+                to: env.EMAIL_TO
             )
+            cleanWs()
         }
 
         failure {
@@ -169,9 +169,6 @@ pipeline {
                 """,
                 to: env.EMAIL_TO
             )
-        }
-
-        always {
             cleanWs()
         }
     }
