@@ -29,37 +29,6 @@ pipeline {
                     '''
 
                 }
-pipeline {
-
-    agent any
-
-    stages {
-
-        stage('Verify Workspace') {
-
-            steps {
-
-                sh '''
-                    pwd
-                    ls -la
-                '''
-
-            }
-
-        }
-
-        stage('Terraform Init') {
-
-            steps {
-
-                dir('Terraform') {
-
-                    sh '''
-                        terraform init \
-                            -input=false
-                    '''
-
-                }
 
             }
 
@@ -75,19 +44,6 @@ pipeline {
 
         }
 
-    }
-
-}
-            }
-
-        }
-    Post
-            {
-                always 
-                        {
-                            cleanWs()
-                        }
-            }  
     }
 
 }
