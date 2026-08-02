@@ -7,8 +7,9 @@ pipeline {
     }
 
     environment {
-        ENVIRONMENT = "dev"
+        ENVIRONMENT      = "dev"
         TF_IN_AUTOMATION = "true"
+        EMAIL_TO         = "srikarlolla2468@gmail.com"
     }
 
     stages {
@@ -52,40 +53,46 @@ pipeline {
 
                         sh '''
                             set +e
+
                             terraform plan \
-                            -detailed-exitcode \
-                            -no-color \
-                            -out=tfplan > plan.log 2>&1
+                                -detailed-exitcode \
+                                -no-color \
+                                -out=tfplan > plan.log 2>&1
+
                             echo $? > tf_exit
-                            
-                            #Optional features
+
                             terraform show -no-color tfplan > full-plan.log
+
                             echo "========== Terraform Drift Summary ==========" > summary.log
                             grep -A50 -E "^  #|^Plan:" full-plan.log >> summary.log
-                            
                         '''
-                        
+
                         env.PLAN_EXIT = readFile('tf_exit').trim()
+
                         currentBuild.description = "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
+
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
-                        //Optional features
+
                         echo "========== Terraform Plan Summary =========="
-                            sh '''
-                                if [ -s summary.log ]; then
-                                    cat summary.log
-                                else
-                                    echo "No summary generated"
-                                fi
-                                '''
+
+                        sh '''
+                            if [ -s summary.log ]; then
+                                cat summary.log
+                            else
+                                echo "No summary generated"
+                            fi
+                        '''
+
                         echo "============================================"
+
                         archiveArtifacts artifacts: 'plan.log,full-plan.log,summary.log'
 
                         if (env.PLAN_EXIT == "0") {
                             echo "No Drift detected"
-                        } 
+                        }
                         else if (env.PLAN_EXIT == "2") {
                             unstable("Terraform Drift detected")
-                        } 
+                        }
                         else {
                             error("Terraform Plan failed")
                         }
@@ -99,13 +106,71 @@ pipeline {
 
         success {
             echo "No Drift"
+
+            emailext(
+                subject: "SUCCESS: Terraform Drift Check - ${env.JOB_NAME}",
+                body: """
+                        Hello,
+
+                            Terraform drift check completed successfully.
+
+                            Job Name : ${env.JOB_NAME}
+                            Build No : ${env.BUILD_NUMBER}
+                            Status   : SUCCESS
+
+                            No infrastructure drift was detected.
+
+                            Build URL: ${env.BUILD_URL}
+                        """,
+                to: env.EMAIL_TO
+            )
         }
+
         unstable {
             echo "Terraform Drift detected"
+
+            emailext(
+                subject: "ALERT: Terraform Drift Detected - ${env.JOB_NAME}",
+                body: """
+                    Hello,
+
+                        Terraform drift has been detected.
+
+                        Job Name : ${env.JOB_NAME}
+                        Build No : ${env.BUILD_NUMBER}
+                        Status   : UNSTABLE
+
+                        Please review the attached Terraform plan and summary.
+
+                        Build URL: ${env.BUILD_URL}
+                """,
+                to: env.EMAIL_TO,
+                attachmentsPattern: "Terraform/plan.log,Terraform/full-plan.log,Terraform/summary.log"
+            )
         }
+
         failure {
             echo "Terraform Pipeline Failed"
+
+            emailext(
+                subject: "FAILED: Terraform Pipeline - ${env.JOB_NAME}",
+                body: """
+                    Hello,
+
+                        The Terraform pipeline execution failed.
+
+                        Job Name : ${env.JOB_NAME}
+                        Build No : ${env.BUILD_NUMBER}
+                        Status   : FAILED
+
+                        Please review the Jenkins console logs.
+
+                        Build URL: ${env.BUILD_URL}
+                """,
+                to: env.EMAIL_TO"
+            )
         }
+
         always {
             cleanWs()
         }
