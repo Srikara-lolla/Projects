@@ -58,7 +58,7 @@ pipeline {
                             > plan.log 2>&1
                             echo $? > tf_exit
                             #Optional features
-                            grep -A 20 -B 5 "Plan:" plan.log > summary.log || true
+                            grep -E "^  #|^    ~|^    \+|^    -" full-plan.log > summary.log || true
                         '''
                         env.PLAN_EXIT = readFile('tf_exit').trim()
                         currentBuild.description = "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
