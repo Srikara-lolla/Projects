@@ -78,7 +78,7 @@ pipeline {
                                 fi
                                 '''
                         echo "============================================"
-                        archiveArtifacts artifacts: 'plan.log,full-plan.log,summary.log,tfplan.log'
+                        archiveArtifacts artifacts: 'plan.log,full-plan.log,summary.log'
 
                         if (env.PLAN_EXIT == "0") {
                             echo "No Drift detected"
