@@ -1,17 +1,18 @@
 pipeline {
     agent any
-    
+
     options {
         timestamps()
         disableConcurrentBuilds()
     }
-    
+
     environment {
         ENVIRONMENT = "dev"
         TF_IN_AUTOMATION = "true"
     }
-    
+
     stages {
+
         stage('Verify Workspace') {
             steps {
                 sh '''
@@ -20,6 +21,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Terraform Init') {
             steps {
                 dir('Terraform') {
@@ -31,50 +33,73 @@ pipeline {
                 }
             }
         }
+
         stage('Terraform Validate') {
             steps {
                 dir('Terraform') {
                     sh '''
                         terraform validate \
-                        -no-color
+                            -no-color
                     '''
                 }
             }
         }
+
         stage('Terraform Plan') {
             steps {
                 dir('Terraform') {
                     script {
+
                         sh '''
                             set +e
+
                             terraform plan \
                             -detailed-exitcode \
                             -no-color \
                             > plan.log 2>&1
+
                             echo $? > tf_exit
                         '''
+
                         env.PLAN_EXIT = readFile('tf_exit').trim()
+
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
+
                         if (env.PLAN_EXIT == "0") {
+
                             echo "No Drift detected"
+
                         } 
                         else if (env.PLAN_EXIT == "2") {
+
                             unstable("Terraform Drift detected")
+
                         } 
                         else {
+
                             error("Terraform Plan failed")
+
                         }
                     }
                 }
             }
         }
+
+    }
+
     post {
+
         success {
             echo "No Drift"
-            }
+        }
         unstable {
             echo "Terraform Drift detected"
         }
+        failure {
+            echo "Terraform Pipeline Failed"
+        }
+        always {
+            cleanWs()
+        }
     }
-}
 }
