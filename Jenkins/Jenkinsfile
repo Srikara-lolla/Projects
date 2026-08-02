@@ -55,13 +55,27 @@ pipeline {
                             set +e
 
                             terraform plan \
-                                -detailed-exitcode \
-                                -no-color \
-                                -out=tfplan > plan.log 2>&1
+                            -detailed-exitcode \
+                            -no-color \
+                            -out=tfplan > plan.log 2>&1
 
-                            echo $? > tf_exit
+                            TF_EXIT=$?
 
-                            terraform show -no-color tfplan > full-plan.log
+                            echo $TF_EXIT > tf_exit
+
+                            if [ $TF_EXIT -eq 0 ]; then
+
+                                echo "No infrastructure drift detected" > full-plan.log
+
+                            elif [ $TF_EXIT -eq 2 ]; then
+
+                                terraform show -no-color tfplan > full-plan.log
+
+                            else
+
+                                echo "Terraform plan failed" > full-plan.log
+
+                            fi
 
                             echo "========== Terraform Drift Summary ==========" > summary.log
                             grep -A50 -E "^  #|^Plan:" full-plan.log >> summary.log
