@@ -61,7 +61,7 @@ pipeline {
 
                             TF_EXIT=$?
 
-                            echo $TF_EXIT > tf_exit
+                            echo $TF_EXIT > tf_exit"
 
                             if [ $TF_EXIT -eq 0 ]; then
 
