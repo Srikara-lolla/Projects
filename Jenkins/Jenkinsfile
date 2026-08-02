@@ -60,10 +60,8 @@ pipeline {
                             
                             #Optional features
                             terraform show -no-color tfplan > full-plan.log
-                            cat <<EOF > summary.log
-                            ========== Terraform Drift Summary ==========
-                            EOF
-                            grep -A20 -E "^  #|^Plan:" full-plan.log >> summary.log
+                            echo "========== Terraform Drift Summary ==========" > summary.log
+                            grep -A50 -E "^  #|^Plan:" full-plan.log >> summary.log
                             
                         '''
                         
