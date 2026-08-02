@@ -7,8 +7,9 @@ pipeline {
     }
     
     environment {
-    TF_IN_AUTOMATION = "true"
-        }
+        ENVIRONMENT = "dev"
+        TF_IN_AUTOMATION = "true"
+    }
     
     stages {
         stage('Verify Workspace') {
@@ -66,6 +67,13 @@ pipeline {
                     }
                 }
             }
+        }
+    post {
+        success {
+            echo "No Drift"
+            }
+        unstable {
+            echo "Terraform Drift detected"
         }
     }
 }
