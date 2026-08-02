@@ -4,30 +4,12 @@ pipeline {
 
     stages {
 
-        stage('Checkout Repository') {
-
-            steps {
-
-                git(
-                    branch: 'main',
-                    credentialsId: 'github-pat',
-                    url: 'https://github.com/Srikara-lolla/Projects.git'
-                )
-
-            }
-
-        }
-
         stage('Verify Workspace') {
 
             steps {
 
                 sh '''
-                    echo "Workspace:"
                     pwd
-
-                    echo ""
-                    echo "Repository Contents:"
                     ls -la
                 '''
 
@@ -35,21 +17,46 @@ pipeline {
 
         }
 
-        stage('Verify Terraform Directory') {
+        stage('Terraform Init') {
 
             steps {
 
                 dir('Terraform') {
 
                     sh '''
-                        echo "Terraform Directory:"
-                        pwd
+                        terraform init \
+                            -input=false
+                    '''
 
-                        echo ""
-                        echo "Terraform Files:"
-                        ls -la
+                }
+pipeline {
 
-                        terraform --version
+    agent any
+
+    stages {
+
+        stage('Verify Workspace') {
+
+            steps {
+
+                sh '''
+                    pwd
+                    ls -la
+                '''
+
+            }
+
+        }
+
+        stage('Terraform Init') {
+
+            steps {
+
+                dir('Terraform') {
+
+                    sh '''
+                        terraform init \
+                            -input=false
                     '''
 
                 }
@@ -58,6 +65,29 @@ pipeline {
 
         }
 
+    }
+
+    post {
+
+        always {
+
+            cleanWs()
+
+        }
+
+    }
+
+}
+            }
+
+        }
+    Post
+            {
+                always 
+                        {
+                            cleanWs()
+                        }
+            }  
     }
 
 }
