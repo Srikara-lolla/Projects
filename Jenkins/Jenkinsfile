@@ -52,39 +52,29 @@ pipeline {
 
                         sh '''
                             set +e
-
                             terraform plan \
                             -detailed-exitcode \
                             -no-color \
                             > plan.log 2>&1
-
                             echo $? > tf_exit
                         '''
-
                         env.PLAN_EXIT = readFile('tf_exit').trim()
-
                         echo "Terraform Plan Exit Code: ${env.PLAN_EXIT}"
+                        archiveArtifacts artifacts: 'plan.log', allowEmpty: true
 
                         if (env.PLAN_EXIT == "0") {
-
                             echo "No Drift detected"
-
                         } 
                         else if (env.PLAN_EXIT == "2") {
-
                             unstable("Terraform Drift detected")
-
                         } 
                         else {
-
                             error("Terraform Plan failed")
-
                         }
                     }
                 }
             }
         }
-
     }
 
     post {
