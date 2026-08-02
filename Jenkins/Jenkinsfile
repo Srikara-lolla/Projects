@@ -57,7 +57,7 @@ pipeline {
                             terraform plan \
                             -detailed-exitcode \
                             -no-color \
-                            -out=tfplan > plan.log 2>&1
+                            -out=tfplan > plan1.log 2>&1
 
                             TF_EXIT=$?
 
