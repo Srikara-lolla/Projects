@@ -78,7 +78,7 @@ pipeline {
                             fi
 
                             echo "========== Terraform Drift Summary ==========" > summary.log
-                            grep -A50 -E "^  #|^Plan:" full-plan.log >> summary.log
+                            grep -A50 -E "^  #|^Plan:" full-plan.log >> summary.log || true
                         '''
 
                         env.PLAN_EXIT = readFile('tf_exit').trim()
